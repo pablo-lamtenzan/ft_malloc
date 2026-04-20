@@ -1,0 +1,38 @@
+name: C Project CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build_and_test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang clang-tidy clang-format bear libcriterion-dev gcovr valgrind
+
+    - name: Install pre-commit
+      run: pip3 install pre-commit
+
+    - name: Verify srcs.mk generation
+      run: |
+        make srcs.mk
+        git diff --exit-code srcs.mk || (echo "srcs.mk is not up to date. Run 'make srcs.mk' and commit." && exit 1)
+
+    - name: Run complete test suite (make check)
+      run: make check
+
+    - name: Upload coverage report
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report
+        path: coverage/
+        retention-days: 14

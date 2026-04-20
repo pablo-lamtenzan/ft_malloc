@@ -1,0 +1,36 @@
+# Build directories and artifacts
+build/
+bin/
+*.o
+*.a
+*.so
+*.dylib
+
+# Binaries (these can be updated based on project)
+project_name
+test_basic
+*.out
+
+# Coverage files
+*.gcda
+*.gcno
+*.gcov
+coverage/
+coverage.xml
+coverage.html
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Tools
+compile_commands.json
+.cache/
+.clangd/
+
+# Auto-generated source list (optional to ignore, but usually we track it if we want it in git)
+# For this template, srcs.mk will be generated, but it's often checked in to avoid requiring the script.
+# We will NOT ignore srcs.mk so it can be tracked.
