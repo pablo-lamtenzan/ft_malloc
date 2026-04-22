@@ -28,8 +28,13 @@ int sys_munmap(void *const ptr, const size_t size)
 
 /*
  * Obtain the system page size dynamically.
+ * Subject strictly requires `getpagesize()` on macOS and `sysconf` on Linux.
  */
 size_t get_page_size(void)
 {
+#ifdef __APPLE__
+    return ((size_t) getpagesize());
+#else
     return ((size_t) sysconf(_SC_PAGESIZE));
+#endif
 }

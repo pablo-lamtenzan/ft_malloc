@@ -9,6 +9,9 @@ bin/
 # Binaries (these can be updated based on project)
 project_name
 test_basic
+test_integration
+test_suites
+test_main
 *.out
 
 # Coverage files
