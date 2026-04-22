@@ -38,16 +38,19 @@ When a Zone is requested from the OS via `mmap`, it is divided into smaller bloc
   (Used)               (Used)               (Free)
 ```
 
-**The Header Structure:**
+**The Header Structure (Implicit Free List / Boundary Tags):**
 
 ```c
-struct s_chunk {
-    size_t size;        // Size of the block (including header)
-    bool   is_free;     // Is this block available?
-    t_chunk *next;      // Pointer to the next chunk in memory
-    t_chunk *prev;      // Pointer to the previous chunk (for coalescing)
-};
+typedef struct s_chunk {
+    size_t prev_size; // Size of the previous block (only valid if prev block is free)
+    size_t size;      // Size of this block AND state flags (Free, Prev_Free)
+} t_chunk;
 ```
+
+Because memory is always 16-byte aligned, the lowest bits of `size` are unused. We use these bits to store states:
+
+* `FLAG_FREE (0x1)`: Is this chunk free?
+* `FLAG_PREV_FREE (0x2)`: Is the chunk directly before this one free?
 
 ### 3. The Lifecycle of an Allocation
 
@@ -55,23 +58,23 @@ struct s_chunk {
 
 1. **Categorize**: Determine if the requested `size` belongs in TINY, SMALL, or LARGE.
 2. **Search**: Traverse the linked list of Zones for that category.
-3. **Find Fit**: Traverse the chunks within the zone to find a `free` chunk large enough to hold the requested size (First-Fit algorithm).
+3. **Find Fit**: Traverse the chunks linearly within the zone to find a free chunk large enough to hold the requested size (First-Fit algorithm).
 4. **Split**: If the found free chunk is much larger than needed, split it into two chunks: one `used` chunk for the user, and one new `free` chunk containing the remaining space.
 
 **`free(ptr)`:**
 
 1. **Identify**: Retrieve the hidden Header by subtracting `sizeof(t_chunk)` from the user's pointer.
-2. **Mark Free**: Set `is_free = true`.
+2. **Mark Free**: Set the `FLAG_FREE` bit on this chunk, and update the `FLAG_PREV_FREE` bit on the *next* chunk.
 3. **Coalesce (Defragment)**:
-   * If the `next` chunk is also free, merge them together into one bigger block.
-   * If the `prev` chunk is also free, merge backwards.
-   *(This ensures we don't end up with thousands of tiny useless fragments).*
+   * **Forward**: Check if the *next* adjacent chunk's `FLAG_FREE` is set. If so, absorb its size.
+   * **Backward**: Check our own `FLAG_PREV_FREE` bit. If set, use `prev_size` to jump exactly to the header of the previous chunk and merge our size into it.
+   *(This boundary tag math achieves instantaneous O(1) coalescing without needing doubly-linked pointers!)*
 4. **Release**: If a Zone becomes completely empty (all chunks merged into one giant free block), we call `munmap` to return the entire Zone back to the Operating System!
 
 ## Technical Features
 
 * **Thread-Safety**: Protected by `pthread_mutex_t` locks to guarantee atomic state operations across multithreaded environments.
-* **O(1) Backwards Coalescing**: Uses doubly-linked chunks to merge adjacent free memory instantly.
+* **O(1) Boundary Tag Coalescing**: Uses implicit free lists and size bit-stealing to merge adjacent free memory instantly without external list overhead.
 * **Out-of-Memory (OOM) Protection**: Gracefully catches `MAP_FAILED` when system virtual memory limits (`getrlimit`) are choked.
 * **100% Static Analysis Clean**: Zero warnings across `clang-tidy`, zero memory leaks in `Valgrind`, and 90% Test Coverage verified by `Criterion`.
 
@@ -140,19 +143,3 @@ pip3 install pre-commit
 * `make tidy`: Run `clang-tidy` checks using the compilation database.
 * `make compdb`: Generate `compile_commands.json` using `Bear`.
 * `make check`: Run the complete test suite and linters sequentially (format-check, tidy, test, san, valgrind, coverage).
-
-## AI Agent Integration (AX)
-
-This repository is specifically designed to be friendly to AI coding assistants.
-
-* Agents do **not** need to parse complex Makefiles. They just need to invoke `./scripts/gen_srcs.sh src include` (or `make srcs.mk`) after creating or deleting files. The `srcs.mk` is deterministically written.
-* Agents can run `make format` to fix any stylistic discrepancies autonomously.
-* Agents can run `make test` or `make san` to iteratively verify correctness.
-
-## Adapting to a Library (e.g., custom malloc)
-
-This template is agnostic to the project structure. If you are building a shared library like `malloc`:
-
-1. Change `NAME` in the Makefile to `libftmalloc.so`.
-2. Add `-shared` to `CFLAGS`/`LDFLAGS` as appropriate.
-3. Remove or rewrite `src/main.c`. (The Makefile already filters out `src/main.c` when compiling the test binary).
