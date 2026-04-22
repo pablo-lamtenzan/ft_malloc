@@ -80,7 +80,7 @@ pip3 install pre-commit
 - `make check`: Run the complete test suite and linters sequentially (format-check, tidy, test, san, valgrind, coverage).
 
 ## AI Agent Integration (AX)
-This repository is specifically designed to be friendly to AI coding assistants. 
+This repository is specifically designed to be friendly to AI coding assistants.
 - Agents do **not** need to parse complex Makefiles. They just need to invoke `./scripts/gen_srcs.sh src include` (or `make srcs.mk`) after creating or deleting files. The `srcs.mk` is deterministically written.
 - Agents can run `make format` to fix any stylistic discrepancies autonomously.
 - Agents can run `make test` or `make san` to iteratively verify correctness.

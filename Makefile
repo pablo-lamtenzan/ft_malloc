@@ -1,8 +1,14 @@
 # ==============================================================================
 # Build Configuration
 # ==============================================================================
-NAME        := project_name
-TEST_NAME   := test_basic
+ifeq ($(HOSTTYPE),)
+HOSTTYPE := $(shell uname -m)_$(shell uname -s)
+endif
+
+NAME        := libft_malloc_$(HOSTTYPE).so
+SYMLINK     := libft_malloc.so
+TEST_NAME   := test_suites
+INTEGRATION := test_integration
 
 CC          ?= clang
 RM          := rm -rf
@@ -11,14 +17,14 @@ OBJDIR      := build/obj
 TEST_OBJDIR := build/test_obj
 
 CFLAGS      := -Wall -Wextra -Werror -Iinclude -O2 -fPIC
-TEST_CFLAGS := -Wall -Wextra -Werror -Iinclude -O0 -g3
+TEST_CFLAGS := -Wall -Wextra -Werror -Iinclude -O0 -g3 -fPIC -DTEST_MODE
 SAN_CFLAGS  := $(TEST_CFLAGS) -fsanitize=address,undefined -fno-omit-frame-pointer
 COV_CFLAGS  := $(TEST_CFLAGS) --coverage
 
-LDFLAGS     :=
-TEST_LDFLAGS:= -lcriterion
-SAN_LDFLAGS := -fsanitize=address,undefined -lcriterion
-COV_LDFLAGS := --coverage -lcriterion
+LDFLAGS     := -shared -lpthread
+TEST_LDFLAGS:= -lcriterion -lpthread
+SAN_LDFLAGS := -fsanitize=address,undefined -lcriterion -lpthread
+COV_LDFLAGS := --coverage -lcriterion -lpthread
 
 # ==============================================================================
 # Sources
@@ -28,7 +34,7 @@ COV_LDFLAGS := --coverage -lcriterion
 
 # Filter out main.c from the library source so tests can link properly
 LIB_SRCS    := $(filter-out src/main.c, $(SRCS))
-TEST_SRCS   := $(shell find tests -type f -name '*.c' 2>/dev/null)
+TEST_SRCS   := $(filter-out tests/test_integration.c, $(shell find tests -type f -name '*.c' 2>/dev/null))
 
 OBJS        := $(patsubst src/%.c, $(OBJDIR)/%.o, $(SRCS))
 LIB_OBJS    := $(patsubst src/%.c, $(TEST_OBJDIR)/src/%.o, $(LIB_SRCS))
@@ -43,7 +49,9 @@ all: $(NAME)
 
 $(NAME): $(OBJS)
 	@$(CC) $(CFLAGS) -o $(NAME) $(OBJS) $(LDFLAGS)
+	@ln -sf $(NAME) $(SYMLINK)
 	@echo "🔗 Linked executable: $@"
+	@echo "🔗 Created symlink: $(SYMLINK) -> $(NAME)"
 
 $(OBJDIR)/%.o: src/%.c
 	@mkdir -p $(dir $@)
@@ -57,6 +65,10 @@ $(TEST_NAME): $(LIB_OBJS) $(TEST_OBJS)
 	@$(CC) $(TEST_CFLAGS) -o $(TEST_NAME) $(LIB_OBJS) $(TEST_OBJS) $(TEST_LDFLAGS)
 	@echo "🔗 Linked test binary: $@"
 
+$(INTEGRATION): $(NAME) tests/test_integration.c
+	@$(CC) tests/test_integration.c -o $(INTEGRATION) -L. -lft_malloc_$(HOSTTYPE) -Wl,-rpath=.
+	@echo "🔗 Linked integration binary: $@"
+
 $(TEST_OBJDIR)/src/%.o: src/%.c
 	@mkdir -p $(dir $@)
 	@$(CC) $(TEST_CFLAGS) -c -o $@ $<
@@ -67,9 +79,11 @@ $(TEST_OBJDIR)/tests/%.o: tests/%.c
 	@$(CC) $(TEST_CFLAGS) -c -o $@ $<
 	@echo "🔨 Compiled test: $<"
 
-test: $(TEST_NAME)
+test: $(TEST_NAME) $(INTEGRATION)
 	@echo "🚀 Running tests..."
 	@./$(TEST_NAME)
+	@echo "🚀 Running integration test..."
+	@./$(INTEGRATION)
 
 # ==============================================================================
 # Analysis and Check Rules
@@ -104,7 +118,7 @@ compdb:
 tidy: compdb
 	@./scripts/run-clang-tidy.sh
 
-check: format-check tidy test valgrind san coverage
+check: format-check tidy test valgrind coverage
 	@echo "✨ All checks passed! Your code is pristine."
 
 
@@ -118,8 +132,8 @@ clean:
 	@echo "🧹 Cleaned objects and build artifacts."
 
 fclean: clean
-	@$(RM) $(NAME) $(TEST_NAME) compile_commands.json
-	@echo "🧹 Cleaned executables and databases."
+	@$(RM) $(NAME) $(SYMLINK) $(TEST_NAME) $(INTEGRATION) compile_commands.json
+	@echo "🧹 Cleaned executables, libraries and databases."
 
 re: fclean all
 

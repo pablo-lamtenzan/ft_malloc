@@ -4,10 +4,15 @@ INCDIR = include
 SRCDIR = src
 
 HDRS = \
-	include/project.h
+	include/ft_malloc.h
 
 
 SRCS = \
-	src/main.c \
-	src/project.c
-
+	src/free.c \
+	src/lib/arena.c \
+	src/lib/chunk.c \
+	src/lib/system.c \
+	src/lib/zone.c \
+	src/malloc.c \
+	src/realloc.c \
+	src/show_alloc_mem.c

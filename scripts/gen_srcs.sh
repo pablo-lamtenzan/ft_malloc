@@ -21,13 +21,13 @@ echo "Generating $DEST..."
     echo "INCDIR = $INCDIR"
     echo "SRCDIR = $SRCDIR"
     echo ""
-    
+
     echo "HDRS = \\"
     # Find all .h files, sort them, indent with a tab, and append a backslash to all but the last line
     find "$INCDIR" -type f -name '*.h' | sort | sed 's/^/	/' | sed '$!s/$/ \\/'
     echo ""
     echo ""
-    
+
     echo "SRCS = \\"
     # Find all .c files, sort them, indent with a tab, and append a backslash to all but the last line
     find "$SRCDIR" -type f -name '*.c' | sort | sed 's/^/	/' | sed '$!s/$/ \\/'
